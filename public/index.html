@@ -496,17 +496,26 @@
       const adminMatrix = document.getElementById('adminMatrix');
       const statusBadge = document.getElementById('statusText');
 
-      let currentSnapshot = null;
+      let cachedAdminSnapshot = null;
+      let cachedUserSnapshot = null;
+      let record_timestamp = null; // Tracks exactly when the server gave us the data
+      let current_time = null;
+
+      let fetchInterval = null; // Controls the background API calls
+      let renderInterval = null; // Controls the 1-second UI clock ticks
+
       let currentUser = null;
-      let refreshInterval = null;
       let currentUsername = usernameParam.trim();
       let contestStart = null;
       let contestEnd = null;
 
       function stopRefreshLoop() {
-        if (refreshInterval !== null) {
-          clearInterval(refreshInterval);
-          refreshInterval = null;
+        if (fetchInterval) {
+          clearInterval(fetchInterval);
+        }
+        
+        if (renderInterval) {
+          clearInterval(renderInterval);
         }
       }
 
@@ -563,7 +572,6 @@
       async function fetchSnapshot() {
         const response = await fetch('/api/admin/submissions');
         const data = await response.json();
-        currentSnapshot = data;
         contestStart = data.contestStart;
         contestEnd = data.contestEnd;
         currentUser = data.users.find((user) => user.username === currentUsername) || null;
@@ -805,35 +813,87 @@
       function showMessage(message) {
         statusBadge.textContent = message;
         setTimeout(() => {
-          updateContestBadge(currentSnapshot);
+          updateContestBadge(cachedUserSnapshot);
         }, 4000);
       }
 
       async function refreshDashboard() {
+        try {
+          if (role === 'admin') {
+            cachedAdminSnapshot = await fetchLeaderboardSnapshot();
+            record_timestamp = Date.now();
+          } else {
+            cachedUserSnapshot = await fetchSnapshot();
+            record_timestamp = Date.now();
+          }
+        } catch (error) {
+          console.error('Failed to sync with backend:', error);
+        }
+      }
+
+      function updateViews() {
+        current_time = Date.now();
+        const elapsedSinceSync = record_timestamp ? Math.floor((current_time - record_timestamp) / 1000) : 0;
+
         if (role === 'admin') {
-          const leaderboardSnapshot = await fetchLeaderboardSnapshot();
-          updateContestBadge(leaderboardSnapshot);
-          updateCountdown(leaderboardSnapshot);
-          renderAdminView(leaderboardSnapshot);
+          if (!cachedAdminSnapshot) return; // Wait until first fetch completes
+          
+          const displayAdminSnapshot = structuredClone(cachedUserSnapshot);
+          
+          displayAdminSnapshot.contestActive = (current_time >= contestStart && current_time < contestEnd);
+          displayAdminSnapshot.contestEnded = current_time >= contestEnd;
+
+          displayAdminSnapshot.users.forEach(user => {
+            const activeProb = user.problems.find(p => p.status === 'active');
+            if(activeProb){
+              activeProb.elapsedSeconds = (activeProb.elapsedSeconds || 0) + elapsedSinceSync;
+              user.totalTimeSpent = (user.totalTimeSpent || 0) + elapsedSinceSync;
+            }
+          });
+
+          updateContestBadge(displayAdminSnapshot);
+          updateCountdown(displayAdminSnapshot);
+          renderAdminView(displayAdminSnapshot);
+          
           userView.classList.add('hidden');
           adminView.classList.remove('hidden');
-          if (leaderboardSnapshot.contestEnded) {
+          
+          if (displayAdminSnapshot.contestEnded) {
             stopRefreshLoop();
           }
           return;
         }
 
-        const snapshot = await fetchSnapshot();
-        updateContestBadge(snapshot);
-        updateCountdown(snapshot);
-        renderUserView(snapshot);
+        if (!cachedUserSnapshot) return;
+        
+        const displayUserSnapshot = structuredClone(cachedUserSnapshot);
+        
+        displayUserSnapshot.contestActive = (current_time >= contestStart && current_time < contestEnd);
+        displayUserSnapshot.contestEnded = current_time >= contestEnd;
+
+        const currentUserData = displayUserSnapshot.users.find(u => u.username === currentUsername);
+
+        if (currentUserData) {
+          const activeProb = currentUserData.problems.find(p => p.status === 'active');
+          if (activeProb) {
+            activeProb.elapsedSeconds = (activeProb.elapsedSeconds || 0) + elapsedSinceSync;
+            currentUserData.totalTimeSpent = (currentUserData.totalTimeSpent || 0) + elapsedSinceSync;
+          }
+        }
+
+        // 3. Render the UI using the extrapolated data
+        updateContestBadge(displayUserSnapshot);
+        updateCountdown(displayUserSnapshot);
+        renderUserView(displayUserSnapshot);
+        
         adminView.classList.add('hidden');
         userView.classList.remove('hidden');
-        if (snapshot.contestEnded) {
+
+        if (displayUserSnapshot.contestEnded) {
           stopRefreshLoop();
         }
       }
-
+  
       async function registerCurrentUser() {
         const username = usernameInput.value.trim();
         if (!username) {
@@ -881,12 +941,15 @@
           registerCurrentUser();
         }
 
-        if (refreshInterval) {
-          clearInterval(refreshInterval);
-        }
+        stopRefreshLoop();
+
+        refreshDashboard();
+        fetchInterval = setInterval(() => {
+          refreshDashboard().catch(() => {});
+        }, 10000);
 
         refreshInterval = setInterval(() => {
-          refreshDashboard().catch(() => {});
+          updateViews().catch(() => {});
         }, 1000);
       }
 
