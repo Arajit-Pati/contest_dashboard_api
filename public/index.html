@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contest Leaderboard Dashboard</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.4;
+        background: #0b1020;
+        color: #f8fafc;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background:
+          radial-gradient(circle at top left, rgba(59, 130, 246, 0.4), transparent 28%),
+          radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.28), transparent 25%),
+          #0b1020;
+      }
+
+      .page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .brand {
+        font-size: 2rem;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.7);
+        border: 1px solid rgba(148, 163, 184, 0.12);
+      }
+
+      .badge span {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        opacity: 0.6;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1.45fr 1fr;
+        gap: 20px;
+      }
+
+      .panel {
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.82), rgba(15, 23, 42, 0.72));
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 12px 50px rgba(2, 6, 23, 0.28);
+      }
+
+      .panel h2,
+      .panel h3 {
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+
+      .countdown {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        margin-top: 16px;
+        padding: 16px;
+        background: rgba(15, 23, 42, 0.55);
+        border-radius: 16px;
+        border: 1px solid rgba(14, 165, 233, 0.12);
+      }
+
+      .countdown .label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.24em;
+        opacity: 0.55;
+      }
+
+      .countdown .value {
+        font-size: 2.2rem;
+        font-weight: 800;
+        letter-spacing: -0.05em;
+      }
+
+      .problem-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .problem-card {
+        display: grid;
+        grid-template-columns: 1.2fr auto auto;
+        gap: 10px;
+        align-items: center;
+        padding: 14px;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid transparent;
+      }
+
+      .problem-card.active {
+        border-color: rgba(14, 165, 233, 0.7);
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(59, 130, 246, 0.1));
+      }
+
+      .problem-card.solved {
+        border-color: rgba(16, 185, 129, 0.45);
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(5, 150, 105, 0.08));
+      }
+
+      .problem-name {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .problem-name strong {
+        font-size: 0.98rem;
+      }
+
+      .problem-name small {
+        font-size: 0.72rem;
+        opacity: 0.65;
+      }
+
+      .problem-wrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .problem-action,
+      .accept-action,
+      .admin-switch {
+        border: none;
+        cursor: pointer;
+        font: inherit;
+        padding: 10px 12px;
+        border-radius: 10px;
+      }
+
+      .problem-action {
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: #fff;
+      }
+
+      .problem-action:hover,
+      .accept-action:hover,
+      .admin-switch:hover {
+        filter: brightness(1.08);
+      }
+
+      .accept-action {
+        background: #10b981;
+        color: #052e16;
+      }
+
+      .problem-action:disabled,
+      .accept-action:disabled {
+        background: rgba(15, 23, 42, 0.7);
+        color: rgba(226, 232, 240, 0.38);
+        cursor: not-allowed;
+      }
+
+      .leetcode-link {
+        text-decoration: none;
+        color: #93c5fd;
+        font-weight: 600;
+        font-size: 0.92rem;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 86px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+      }
+
+      .status-active {
+        background: rgba(14, 165, 233, 0.2);
+        color: #7dd3fc;
+      }
+
+      .status-paused {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+      }
+
+      .status-solved {
+        background: rgba(16, 185, 129, 0.18);
+        color: #86efac;
+      }
+
+      .status-unsolved {
+        background: rgba(51, 65, 85, 0.55);
+        color: #94a3b8;
+      }
+
+      .points-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(59, 130, 246, 0.18);
+        color: #bfdbfe;
+        font-size: 0.76rem;
+        font-weight: 700;
+      }
+
+      .problem-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .problem-title {
+        border: none;
+        cursor: pointer;
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .problem-title:disabled {
+        cursor: not-allowed;
+      }
+
+      .timers {
+        display: grid;
+        gap: 10px;
+      }
+
+      .timer-card {
+        padding: 14px;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.55);
+      }
+
+      .timer-card h3 {
+        font-size: 1rem;
+        margin-bottom: 8px;
+      }
+
+      .timer-value {
+        font-size: 2.6rem;
+        font-weight: 800;
+        letter-spacing: -0.07em;
+      }
+
+      .note {
+        font-size: 0.74rem;
+        opacity: 0.6;
+      }
+
+      .registration {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .registration input {
+        flex: 1;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        background: rgba(15, 23, 42, 0.65);
+        border-radius: 12px;
+        padding: 12px;
+        color: #f8fafc;
+      }
+
+      .registration input:focus,
+      .registration button:focus,
+      .problem-action:focus,
+      .accept-action:focus {
+        outline: 2px solid rgba(99, 102, 241, 0.6);
+      }
+
+      .registration button,
+      .refresh-button {
+        border: none;
+        cursor: pointer;
+        font: inherit;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #6366f1, #4f46e5);
+        color: #fff;
+      }
+
+      .admin-grid {
+        margin-top: 14px;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 760px;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 12px 8px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+        vertical-align: top;
+      }
+
+      th {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        opacity: 0.55;
+      }
+
+      .matrix-cell {
+        min-width: 140px;
+        padding: 10px 8px;
+        text-align: center;
+      }
+
+      .matrix-cell div {
+        margin-bottom: 4px;
+      }
+
+      .badge-container {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 86px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+      }
+
+      .badge-container.status-solved {
+        background: rgba(16, 185, 129, 0.18);
+        color: #86efac;
+      }
+
+      .badge-container.status-paused {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+      }
+
+      .badge-container.status-unsolved {
+        background: rgba(51, 65, 85, 0.55);
+        color: #94a3b8;
+      }
+
+      .text-xs {
+        font-size: 0.72rem;
+      }
+
+      .text-gray-400 {
+        color: #94a3b8;
+      }
+
+      .mt-1 {
+        margin-top: 4px;
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .problem-card {
+          grid-template-columns: 1fr;
+          justify-items: stretch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="topbar">
+        <div class="brand">LeetCode Contest Tracker</div>
+        <div class="badge" id="statusBadge">
+          <span>Contest</span>
+          <strong id="statusText">Loading</strong>
+        </div>
+      </section>
+
+      <section id="userView" class="hidden">
+        <div class="grid">
+          <div class="panel">
+            <h2>Contest Countdown</h2>
+            <div class="countdown">
+              <div>
+                <div class="label">Time left</div>
+                <div class="value" id="countdownValue">--:--:--</div>
+              </div>
+              <div>
+                <div class="label">Current active</div>
+                <div class="value" id="activeProblemName" style="font-size: 1.4rem;">None</div>
+              </div>
+            </div>
+
+            <div class="problem-list" id="problemList"></div>
+          </div>
+
+          <div class="panel">
+            <div class="timers">
+              <div class="timer-card">
+                <h3>Time Spent in Solving Current Problem</h3>
+                <div class="timer-value" id="activeTimerValue">00:00:00</div>
+                <div class="note" id="activeTimerNote">No active problem</div>
+              </div>
+              <div class="timer-card">
+                <h3>Your Total Spent</h3>
+                <div class="timer-value" id="totalSpentValue">00:00:00</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="adminView" class="hidden">
+        <div class="panel">
+          <h2>Admin Leaderboard Matrix</h2>
+          <div class="admin-grid" id="adminMatrix"></div>
+        </div>
+      </section>
+
+      <section id="registerPanel" class="panel hidden" style="margin-top: 16px;">
+        <h3>Register Username</h3>
+        <div class="registration">
+          <input id="usernameInput" type="text" placeholder="Enter your LeetCode username" />
+          <button id="registerButton" class="refresh-button">Register</button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const role = params.get('role') === 'admin' ? 'admin' : 'user';
+      const usernameParam = params.get('username') || '';
+
+      const usernameInput = document.getElementById('usernameInput');
+      const registerButton = document.getElementById('registerButton');
+      const problemList = document.getElementById('problemList');
+      const countdownValue = document.getElementById('countdownValue');
+      const activeProblemName = document.getElementById('activeProblemName');
+      const activeTimerValue = document.getElementById('activeTimerValue');
+      const activeTimerNote = document.getElementById('activeTimerNote');
+      const totalSpentValue = document.getElementById('totalSpentValue');
+      const adminMatrix = document.getElementById('adminMatrix');
+      const statusBadge = document.getElementById('statusText');
+
+      let currentSnapshot = null;
+      let currentUser = null;
+      let refreshInterval = null;
+      let currentUsername = usernameParam.trim();
+      let contestStart = null;
+      let contestEnd = null;
+
+      function stopRefreshLoop() {
+        if (refreshInterval !== null) {
+          clearInterval(refreshInterval);
+          refreshInterval = null;
+        }
+      }
+
+      function formatSeconds(totalSeconds) {
+        const safe = Math.max(0, Math.floor(totalSeconds || 0));
+        const hours = Math.floor(safe / 3600);
+        const minutes = Math.floor((safe % 3600) / 60);
+        const seconds = safe % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }
+
+      function formatTime(totalSeconds) {
+        return formatSeconds(totalSeconds);
+      }
+
+      function normalizeProblemName(problemName) {
+        return String(problemName || '')
+          .toLowerCase()
+          .replace(/leetcode/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+      }
+
+      function getProblemEntryForName(problemEntries, problemName) {
+        const normalizedTarget = normalizeProblemName(problemName);
+        return (problemEntries || []).find((entry) => normalizeProblemName(entry?.problemName) === normalizedTarget) || null;
+      }
+
+      function getStatusClass(statusText) {
+        const normalized = String(statusText || 'Unsolved').trim();
+        if (normalized.toLowerCase() === 'solved') {
+          return 'status-solved';
+        }
+        if (normalized.toLowerCase().startsWith('partial')) {
+          return 'status-paused';
+        }
+        return 'status-unsolved';
+      }
+
+      function getTimeRemainingText() {
+        if (!contestStart || !contestEnd) return 'Loading';
+        const now = Date.now();
+        if (now < contestStart) {
+          const diff = contestStart - now;
+          return `${formatSeconds(Math.floor(diff / 1000))}`;
+        }
+        if (now > contestEnd) {
+          return 'ENDED';
+        }
+        const diff = contestEnd - now;
+        return `${formatSeconds(Math.floor(diff / 1000))}`;
+      }
+
+      async function fetchSnapshot() {
+        const response = await fetch('/api/admin/submissions');
+        const data = await response.json();
+        currentSnapshot = data;
+        contestStart = data.contestStart;
+        contestEnd = data.contestEnd;
+        currentUser = data.users.find((user) => user.username === currentUsername) || null;
+        return data;
+      }
+
+      async function fetchLeaderboardSnapshot() {
+        const response = await fetch('/api/leaderboard');
+        const data = await response.json();
+        contestStart = data.contestStart;
+        contestEnd = data.contestEnd;
+        return data;
+      }
+
+      function renderUserView(snapshot) {
+        const user = snapshot.users.find((entry) => entry.username === currentUsername);
+        if (!user) {
+          problemList.innerHTML = '<div class="note">No active submission state found yet.</div>';
+          activeTimerValue.textContent = '00:00:00';
+          activeTimerNote.textContent = 'No active problem';
+          totalSpentValue.textContent = '00:00:00';
+          return;
+        }
+
+        const activeProblem = snapshot.contestActive ? (user.problems.find((problem) => problem.status === 'active') || null) : null;
+        const activeTotalSeconds = activeProblem ? Math.floor(((Number.isFinite(activeProblem.totalTimeSpent) ? activeProblem.totalTimeSpent : 0) + (activeProblem.elapsedSeconds || 0))) : 0;
+        const liveTotal = user.totalTimeSpent || 0;
+
+        activeProblemName.textContent = activeProblem ? activeProblem.problemName : 'None';
+        activeTimerValue.textContent = activeProblem ? formatSeconds(activeTotalSeconds) : '00:00:00';
+        activeTimerNote.textContent = activeProblem ? `${activeProblem.problemName} cumulative time` : 'No active problem';
+        totalSpentValue.textContent = formatSeconds(liveTotal);
+
+        problemList.innerHTML = '';
+        const contestActive = snapshot.contestActive;
+
+        for (const problem of user.problems) {
+          const card = document.createElement('div');
+          const statusText = String(problem.status || 'Unsolved');
+          const statusDisplay = statusText === 'Solved' ? 'SOLVED' : statusText;
+          const safeStatusClass = statusText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          card.className = `problem-card ${safeStatusClass}`;
+
+          const timeDisplay = problem.status === 'active' ? formatSeconds(problem.totalTimeSpent + (problem.elapsedSeconds || 0)) : formatSeconds(problem.totalTimeSpent);
+          const normalizedStatusText = String(problem.status || 'Unsolved').trim();
+          const actionMarkup = (problem.locked || false)
+            ? ``
+            : `<button class="accept-action" data-accept="${problem.problemName}" ${!contestActive ? 'disabled' : ''}>Mark Done</button>`;
+
+          card.innerHTML = `
+            <div class="problem-name">
+              <button class="problem-title" data-name="${problem.problemName}" ${problem.status === 'solved' || !contestActive ? 'disabled' : ''}>
+                <strong>${problem.problemName}</strong>
+              </button>
+              <small>${problem.url ? '<a class="leetcode-link" href="' + problem.url + '" target="_blank" rel="noreferrer" data-problem-name="' + problem.problemName + '">Open on LeetCode</a>' : ''}</small>
+            </div>
+            <div class="status-pill status-${safeStatusClass}">${statusDisplay}</div>
+            <div class="problem-wrap">
+              <div class="points-badge">Points: ${problem.points || 0}</div>
+              ${actionMarkup}
+            </div>
+          `;
+
+          const titleButton = card.querySelector('.problem-title');
+          if (titleButton) {
+            titleButton.addEventListener('click', async () => {
+              if (!currentUsername) return;
+              try {
+                const response = await fetch('/api/track/switch', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ username: currentUsername, problemName: problem.problemName }),
+                });
+                const payload = await response.json();
+                if (payload.ignored) {
+                  showMessage(payload.reason || 'Contest ended.');
+                } else if (!response.ok && payload.error) {
+                  showMessage(payload.error);
+                }
+                await refreshDashboard();
+              } catch (error) {
+                showMessage('Unable to update tracking.');
+              }
+            });
+          }
+
+          const acceptButton = card.querySelector('.accept-action');
+          if (acceptButton) {
+            acceptButton.addEventListener('click', async () => {
+              if (!currentUsername) return;
+              const confirmed = window.confirm('Are you sure you want to submit (the action can not be undone)?');
+              if (!confirmed) {
+                return;
+              }
+
+              try {
+                const response = await fetch('/api/track/accepted', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ username: currentUsername, problemName: problem.problemName, accepted: true }),
+                });
+                const payload = await response.json();
+                if (payload.ignored) {
+                  showMessage(payload.reason || 'Submission ignored.');
+                } else if (payload.finalStatus === 'Solved') {
+                  showMessage(`Problem locked as solved and awarded ${payload.awardedPoints || 0} points.`);
+                } else if (typeof payload.finalStatus === 'string' && payload.finalStatus.startsWith('Partial Attempt')) {
+                  showMessage('Problem locked as a partial attempt with no points.');
+                } else {
+                  showMessage('Problem finalized without points.');
+                }
+                await refreshDashboard();
+              } catch (error) {
+                showMessage('Unable to submit accepted problem.');
+              }
+            });
+          }
+
+          const leetcodeLink = card.querySelector('.leetcode-link');
+          if (leetcodeLink) {
+            leetcodeLink.addEventListener('click', async (event) => {
+              event.preventDefault();
+              const targetUrl = leetcodeLink.getAttribute('href');
+              if (!currentUsername) {
+                showMessage('Register a username before opening problem link.');
+                return;
+              }
+
+              try {
+                const response = await fetch('/api/track/switch', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ username: currentUsername, problemName: problem.problemName }),
+                });
+                const payload = await response.json();
+                if (payload.ignored) {
+                  showMessage(payload.reason || 'Contest ended.');
+                  return;
+                }
+                if (!response.ok) {
+                  showMessage(payload.error || 'Unable to switch problem context.');
+                  return;
+                }
+
+                const token = payload.token;
+                // append token as query param if present
+                let finalUrl = targetUrl || '';
+                if (token) {
+                  const sep = finalUrl.includes('?') ? '&' : '?';
+                  finalUrl = `${finalUrl}${sep}contestToken=${encodeURIComponent(token)}`;
+                }
+
+                if (finalUrl) {
+                  window.open(finalUrl, '_blank', 'noopener,noreferrer');
+                }
+
+                await refreshDashboard();
+              } catch (error) {
+                showMessage('Unable to switch problem context.');
+              }
+            });
+          }
+
+          const timerNode = document.createElement('div');
+          timerNode.className = 'note';
+          timerNode.textContent = `Tracked: ${timeDisplay}`;
+          card.appendChild(timerNode);
+          problemList.appendChild(card);
+        }
+      }
+
+      function renderAdminView(snapshot) {
+        const users = snapshot.users || [];
+        const problems = snapshot.globalProblems;
+        const problemColumns = problems.map((problem) => problem.problemName);
+        const headers = ['Rank', 'Contestant Name', 'Total Points', 'Fully Solved', 'Partially Solved', 'Total Time Spent', ...problemColumns];
+
+        const table = document.createElement('table');
+        const head = document.createElement('thead');
+        head.innerHTML = `
+          <tr>
+            ${headers.map((header) => `<th>${header}</th>`).join('')}
+          </tr>
+        `;
+
+        const body = document.createElement('tbody');
+        users.forEach((user, index) => {
+          const row = document.createElement('tr');
+          const partialCount = Number.isFinite(user.partialCount)
+            ? user.partialCount
+            : (Number.isFinite(user.partialSolvedCount) ? user.partialSolvedCount : 0);
+          const totalPoints = Number.isFinite(user.totalPoints) ? user.totalPoints : 0;
+          const solvedCount = Number.isFinite(user.solvedCount) ? user.solvedCount : 0;
+          const totalTimeSpent = Number.isFinite(user.totalTimeSpent) ? user.totalTimeSpent : 0;
+          const problemEntries = user.problems || [];
+
+          const cells = [
+            `<td><strong>${index + 1}</strong></td>`,
+            `<td><strong>${user.username}</strong></td>`,
+            `<td><strong>${totalPoints}</strong></td>`,
+            `<td><strong>${solvedCount}</strong></td>`,
+            `<td><strong>${partialCount}</strong></td>`,
+            `<td>${formatSeconds(totalTimeSpent)}</td>`,
+            ...problemColumns.map((problemName) => {
+              const entry = getProblemEntryForName(problemEntries, problemName);
+              const statusText = entry ? (entry.status || 'Unsolved') : 'Unsolved';
+              const statusDisplay = statusText.toLowerCase() === 'solved' ? 'SOLVED' : statusText;
+              const statusClass = getStatusClass(statusText);
+              const timeSpent = Number.isFinite(entry?.timeSpent) ? entry.timeSpent : 0;
+              return `<td class="matrix-cell">
+                <div class="badge-container ${statusClass}">${statusDisplay}</div>
+                <div class="text-xs text-gray-400 mt-1">🕒 ${formatTime(timeSpent)}</div>
+              </td>`;
+            }),
+          ];
+
+          row.innerHTML = cells.join('');
+          body.appendChild(row);
+        });
+
+        table.appendChild(head);
+        table.appendChild(body);
+        adminMatrix.innerHTML = '';
+        adminMatrix.appendChild(table);
+      }
+
+      function updateContestBadge(snapshot) {
+        if (!snapshot) {
+          statusBadge.textContent = 'Loading';
+          return;
+        }
+        statusBadge.textContent = snapshot.contestActive ? 'Live' : (snapshot.contestEnded ? 'Ended' : 'Not started');
+      }
+
+      function updateCountdown(snapshot) {
+        countdownValue.textContent = getTimeRemainingText();
+      }
+
+      function showMessage(message) {
+        statusBadge.textContent = message;
+        setTimeout(() => {
+          updateContestBadge(currentSnapshot);
+        }, 4000);
+      }
+
+      async function refreshDashboard() {
+        if (role === 'admin') {
+          const leaderboardSnapshot = await fetchLeaderboardSnapshot();
+          updateContestBadge(leaderboardSnapshot);
+          updateCountdown(leaderboardSnapshot);
+          renderAdminView(leaderboardSnapshot);
+          userView.classList.add('hidden');
+          adminView.classList.remove('hidden');
+          if (leaderboardSnapshot.contestEnded) {
+            stopRefreshLoop();
+          }
+          return;
+        }
+
+        const snapshot = await fetchSnapshot();
+        updateContestBadge(snapshot);
+        updateCountdown(snapshot);
+        renderUserView(snapshot);
+        adminView.classList.add('hidden');
+        userView.classList.remove('hidden');
+        if (snapshot.contestEnded) {
+          stopRefreshLoop();
+        }
+      }
+
+      async function registerCurrentUser() {
+        const username = usernameInput.value.trim();
+        if (!username) {
+          showMessage('Enter a username to register.');
+          return;
+        }
+        currentUsername = username;
+        const response = await fetch('/api/contest/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: currentUsername}),
+        });
+        const payload = await response.json();
+        if (payload.ignored) {
+          showMessage(payload.reason || 'Contest has ended.');
+          return;
+        }
+
+        registerPanel.classList.add('hidden');
+        await refreshDashboard();
+      }
+
+      function initialize() {
+        if (role === 'admin') {
+          adminView.classList.remove('hidden');
+          userView.classList.add('hidden');
+          registerPanel.classList.add('hidden');
+        } else {
+          userView.classList.remove('hidden');
+          adminView.classList.add('hidden');
+          registerPanel.classList.remove('hidden');
+          if (currentUsername) {
+            usernameInput.value = currentUsername;
+          }
+        }
+
+        registerButton.addEventListener('click', registerCurrentUser);
+        usernameInput.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            registerCurrentUser();
+          }
+        });
+
+        if (currentUsername) {
+          registerCurrentUser();
+        }
+
+        if (refreshInterval) {
+          clearInterval(refreshInterval);
+        }
+
+        refreshInterval = setInterval(() => {
+          refreshDashboard().catch(() => {});
+        }, 1000);
+      }
+
+      initialize();
+    </script>
+  </body>
+</html>
