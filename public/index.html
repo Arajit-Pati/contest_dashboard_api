@@ -481,10 +481,10 @@
     </main>
 
     <script>
-      const params = new URLSearchParams(window.location.search);
-      const role = params.get('role') === 'admin' ? 'admin' : 'user';
-      const usernameParam = params.get('username') || '';
+      let params = new URLSearchParams(window.location.search);
+      let usernameParam = params.get('username') || '';
 
+      const role = params.get('role') === 'admin' ? 'admin' : 'user';
       const usernameInput = document.getElementById('usernameInput');
       const registerButton = document.getElementById('registerButton');
       const problemList = document.getElementById('problemList');
@@ -519,6 +519,17 @@
         }
       }
 
+      function startRefreshLoop() {
+        refreshDashboard();
+        fetchInterval = setInterval(() => {
+          refreshDashboard().catch(() => {});
+        }, 10000);
+
+        renderInterval = setInterval(() => {
+          updateViews().catch(() => {});
+        }, 1000);
+      }
+
       function formatSeconds(totalSeconds) {
         const safe = Math.max(0, Math.floor(totalSeconds || 0));
         const hours = Math.floor(safe / 3600);
@@ -547,12 +558,15 @@
       function getStatusClass(statusText) {
         const normalized = String(statusText || 'Unsolved').trim();
         if (normalized.toLowerCase() === 'solved') {
-          return 'status-solved';
+          return 'solved';
         }
-        if (normalized.toLowerCase().startsWith('partial')) {
-          return 'status-paused';
+        if (normalized.toLowerCase().startsWith('partial') || normalized.toLowerCase() === 'paused') {
+          return 'paused';
         }
-        return 'status-unsolved';
+        if(normalized.toLowerCase() === 'active'){
+          return 'active';
+        }
+        return 'unsolved';
       }
 
       function getTimeRemainingText() {
@@ -612,7 +626,7 @@
           const card = document.createElement('div');
           const statusText = String(problem.status || 'Unsolved');
           const statusDisplay = statusText === 'Solved' ? 'SOLVED' : statusText;
-          const safeStatusClass = statusText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          const safeStatusClass = getStatusClass(statusText.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
           card.className = `problem-card ${safeStatusClass}`;
 
           const timeDisplay = problem.status === 'active' ? formatSeconds(problem.totalTimeSpent + (problem.elapsedSeconds || 0)) : formatSeconds(problem.totalTimeSpent);
@@ -782,7 +796,7 @@
               const statusClass = getStatusClass(statusText);
               const timeSpent = Number.isFinite(entry?.timeSpent) ? entry.timeSpent : 0;
               return `<td class="matrix-cell">
-                <div class="badge-container ${statusClass}">${statusDisplay}</div>
+                <div class="badge-container status-${statusClass}">${statusDisplay}</div>
                 <div class="text-xs text-gray-400 mt-1">🕒 ${formatTime(timeSpent)}</div>
               </td>`;
             }),
@@ -838,7 +852,7 @@
         if (role === 'admin') {
           if (!cachedAdminSnapshot) return; // Wait until first fetch completes
           
-          const displayAdminSnapshot = structuredClone(cachedUserSnapshot);
+          const displayAdminSnapshot = structuredClone(cachedAdminSnapshot);
           
           displayAdminSnapshot.contestActive = (current_time >= contestStart && current_time < contestEnd);
           displayAdminSnapshot.contestEnded = current_time >= contestEnd;
@@ -912,6 +926,13 @@
           return;
         }
 
+        if(usernameParam.trim() !== currentUsername){
+          params.set('username', currentUsername);
+
+          const newUrl = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+          window.history.pushState({ path: newUrl }, '', newUrl);
+        }
+
         registerPanel.classList.add('hidden');
         await refreshDashboard();
       }
@@ -925,32 +946,43 @@
           userView.classList.remove('hidden');
           adminView.classList.add('hidden');
           registerPanel.classList.remove('hidden');
+          
           if (currentUsername) {
             usernameInput.value = currentUsername;
-          }
-        }
-
-        registerButton.addEventListener('click', registerCurrentUser);
-        usernameInput.addEventListener('keydown', (event) => {
-          if (event.key === 'Enter') {
             registerCurrentUser();
           }
-        });
-
-        if (currentUsername) {
-          registerCurrentUser();
+          else{
+            registerButton.addEventListener('click', registerCurrentUser);
+            usernameInput.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter') {
+                registerCurrentUser();
+              }
+            });
+          }
         }
 
-        stopRefreshLoop();
+        // Listen for when the user clicks the browser's Back or Forward buttons
+        window.addEventListener('popstate', () => {
+          params = new URLSearchParams(window.location.search);
+          usernameParam = params.get('username');
+          stopRefreshLoop(); // Kill your background fetch/render loops
 
-        refreshDashboard();
-        fetchInterval = setInterval(() => {
-          refreshDashboard().catch(() => {});
-        }, 10000);
+          if (!usernameParam) {
+            // 🔙 User went BACK to the registration URL state
+            
+            // Clear global variables
+            currentUsername = null;
+            cachedAdminSnapshot = null;
+            cachedUserSnapshot = null;
+            record_timestamp = null;
+          } else {
+            currentUsername = usernameParam.trim();
+          }
 
-        refreshInterval = setInterval(() => {
-          updateViews().catch(() => {});
-        }, 1000);
+          initialize();
+        });
+
+        startRefreshLoop();
       }
 
       initialize();

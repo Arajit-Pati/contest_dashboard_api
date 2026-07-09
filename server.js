@@ -120,6 +120,8 @@ function formatProblemList(inputProblems) {
       problemName,
       url,
       status: 'unsolved',
+      locked: false,
+      lastRecordedStatus: null,
       totalTimeSpent: 0,
       timeSpent: 0,
       activeSince: null,
@@ -127,6 +129,24 @@ function formatProblemList(inputProblems) {
       correctTestCases: 0,
       totalTestCases: 0,
     };
+  });
+}
+
+// A flag to ensure we only run the cleanup once
+let hasContestFinalized = false;
+
+function finalizeAllActiveSessions() {
+  if (hasContestFinalized) return;
+  hasContestFinalized = true;
+
+  console.log("Contest Ended! Running automated cleanup for active sessions...");
+
+  Object.values(users).forEach(user => {
+    if (!user.problems) return;
+
+    user.problems.forEach(problem => {
+      finalizeProblemState(problem, problem.lastRecordedStatus);
+    });
   });
 }
 
@@ -268,16 +288,7 @@ function ensureUserRecord(username) {
   if (!users[username]) {
     users[username] = {
       username,
-      problems: normalizedProblems.map((problem) => ({
-        ...problem,
-        points: Number.isFinite(problem.points) ? problem.points : 0,
-        totalTimeSpent: 0,
-        timeSpent: 0,
-        correctTestCases: 0,
-        totalTestCases: 0,
-        locked: false,
-        lastRecordedStatus: null,
-      })),
+      problems: normalizedProblems,
     };
     return users[username];
   }
@@ -286,34 +297,11 @@ function ensureUserRecord(username) {
 
   users[username].problems = normalizedProblems.map((problem) => {
     const existing = existingMap.get(problem.problemName);
-    if (existing) {
-      return {
-        ...existing,
-        problemName: problem.problemName,
-        url: problem.url || existing.url,
-        status: existing.status === 'solved' || existing.status === 'active' || (typeof existing.status === 'string' && existing.status.startsWith('Partial:')) || (typeof existing.status === 'string' && existing.status.startsWith('Partial Lockout')) || existing.status === 'Accepted'
-          ? existing.status
-          : problem.status,
-        totalTimeSpent: Number.isFinite(existing.totalTimeSpent) ? existing.totalTimeSpent : 0,
-        timeSpent: Number.isFinite(existing.timeSpent) ? existing.timeSpent : 0,
-        activeSince: existing.status === 'active' ? existing.activeSince : null,
-        points: Number.isFinite(existing.points) ? existing.points : Number.isFinite(problem.points) ? problem.points : 0,
-        correctTestCases: Number.isFinite(existing.correctTestCases) ? existing.correctTestCases : 0,
-        totalTestCases: Number.isFinite(existing.totalTestCases) ? existing.totalTestCases : 0,
-        locked: existing.locked || existing.status === 'solved' || existing.status === 'Solved' || (typeof existing.status === 'string' && (existing.status.startsWith('Partial:') || existing.status.startsWith('Partial Lockout') || existing.status.startsWith('Partial Attempt'))),
-        lastRecordedStatus: existing.lastRecordedStatus || null,
-      };
+    if (!existing) {
+      return problem;
     }
-
-    return {
-      ...problem,
-      points: Number.isFinite(problem.points) ? problem.points : 0,
-      totalTimeSpent: 0,
-      timeSpent: 0,
-      correctTestCases: 0,
-      totalTestCases: 0,
-      locked: false,
-    };
+    
+    return existing;
   });
 
   return users[username];
@@ -352,10 +340,15 @@ function finalizeProblemState(problem, recordedStatus, testCaseSummary = {}) {
     return { finalStatus: problem.status, awardedPoints: 0 };
   }
 
-  problem.status = 'Partial Attempt';
+  if(problem.status.toLowerCase() === 'unsolved'){
+    problem.lastRecordedStatus = 'unsolved';
+  }
+  else{
+    problem.status = 'Partial Attempt';
+    problem.lastRecordedStatus = 'Partial Attempt';
+  }
   problem.locked = true;
   problem.awardedPoints = 0;
-  problem.lastRecordedStatus = normalizedRecordedStatus || problem.lastRecordedStatus || '';
   return { finalStatus: problem.status, awardedPoints: 0 };
 }
 
@@ -373,10 +366,11 @@ function normalizeSubmissionStatus(rawStatus) {
     return 'Accepted';
   }
 
-  if (trimmed.toLowerCase().startsWith('partial:')) {
-    return trimmed;
+  const match = rawStatus.match(/(\d+\s*\/\s*\d+)/);
+  if (match){
+    return `partial: ${match[1]}`;
   }
-
+  
   return '';
 }
 
@@ -681,7 +675,7 @@ app.post('/api/track/accepted', (req, res) => {
     return res.status(200).json({ ok: true, message: 'Problem is already finalized.', user: serializeUser(user) });
   }
 
-  const recordedStatus = targetProblem.lastRecordedStatus || targetProblem.status || '';
+  const recordedStatus = targetProblem.lastRecordedStatus; // may be null valued
   const finalized = finalizeProblemState(targetProblem, recordedStatus);
 
   return res.status(200).json({
@@ -711,7 +705,7 @@ app.get('/api/admin/export-leaderboard', (req, res) => {
   const rows = snapshot.users.map((user, index) => {
     const problemStatuses = problems.map((problem) => {
       const entry = (user.problems || []).find((item) => item.problemName === problem.problemName);
-      return entry ? entry.lastRecordedStatus : 'Unsolved';
+      return entry ? (entry.lastRecordedStatus || entry.status) : 'Unsolved';
     });
 
     return [index + 1, user.username, user.totalPoints, user.solvedCount, user.partialCount, user.totalTimeSpent, ...problemStatuses];
@@ -746,6 +740,17 @@ app.get('/api/admin/submissions', (req, res) => {
     users: userSnapshots,
   });
 });
+
+// Monitor the contest clock internally
+const endContestMonitor = setInterval(() => {
+    // Check if current time has passed the contest end time
+    if (Date.now() >= CONTEST_END) {
+        finalizeAllActiveSessions();
+        
+        // Stop checking once it's done
+        clearInterval(endContestMonitor);
+    }
+}, 5000); // Checks every 5 seconds
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Contest dashboard API listening on http://localhost:${PORT}`);
