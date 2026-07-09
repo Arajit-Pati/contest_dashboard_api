@@ -1,5 +1,5 @@
-problemName : 'Merge Sorted Array' ; url: 'https://leetcode.com/problems/merge-sorted-array/' ; points : 10
-problemName : 'Multiply Strings' ; url: 'https://leetcode.com/problems/multiply-strings/' ; points : 20
-problemName : 'Unique Paths' ; url: 'https://leetcode.com/problems/unique-paths/' ; points : 20
-problemName : 'Gas Station' ; url: 'https://leetcode.com/problems/gas-station/' ; points : 40
-problemName : 'Number of Islands' ; url: 'https://leetcode.com/problems/number-of-islands/' ; points : 30
+problemName : 'Search Insert Position' ; url: 'https://leetcode.com/problems/search-insert-position/' ; points : 10
+problemName : 'Group Anagrams' ; url: 'https://leetcode.com/problems/group-anagrams/' ; points : 20
+problemName : 'Diameter of Binary Tree' ; url: 'https://leetcode.com/problems/diameter-of-binary-tree/' ; points : 25
+problemName : 'Target Sum' ; url: 'https://leetcode.com/problems/target-sum/' ; points : 35
+problemName : 'Reorder List' ; url: 'https://leetcode.com/problems/reorder-list/' ; points : 40
